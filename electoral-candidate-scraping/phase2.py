@@ -19,8 +19,8 @@ from pathlib import Path
 DATA_FILE = 'assets/combined_data.json'
 IMAGES_FOLDER = 'assets/images'
 PDFS_FOLDER = 'assets/pdfs'
-MIN_DELAY = 3  # Minimum delay between requests (seconds)
-MAX_DELAY = 7  # Maximum delay between requests (seconds)
+MIN_DELAY = 1  # Minimum delay between requests (seconds)
+MAX_DELAY = 2  # Maximum delay between requests (seconds)
 
 # Ensure directories exist
 Path(IMAGES_FOLDER).mkdir(parents=True, exist_ok=True)
