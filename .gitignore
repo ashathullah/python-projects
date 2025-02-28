@@ -1,0 +1,20 @@
+# Image files
+# *.jpg
+# *.jpeg
+# *.png
+# *.gif
+# *.bmp
+# *.tif
+# *.tiff
+# *.ico
+# *.svg
+# *.webp
+
+# PDF files
+# *.pdf
+
+# Optional: Specific directories containing images/PDFs
+images/
+pdfs/
+organized_pdfs/
+# documents/

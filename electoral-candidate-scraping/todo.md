@@ -83,9 +83,9 @@
     - [x] It need to also change the name of file based on it's data eg: {name}.pdf (make sure to add - in between the words instead of space and keep the file format as it is)
     
 
-- [ ] Phase 2 gemini. (Create a python script "phase2-gemini.py" to do the following, refer to phase2-corrections.py for reference)
-    - [ ] let's implemet the gemini instead of mistral AI.
-    - [ ] here is the gemini implementation
+- [X] Phase 2 gemini. (Create a python script "phase2-gemini.py" to do the following, refer to phase2-corrections.py for reference)
+    - [X] let's implemet the gemini instead of mistral AI.
+    - [X] here is the gemini implementation
      ```python
         from google import genai
         from google.genai import types
@@ -103,7 +103,7 @@
 
         print(response.text)
     ```
-    - [ ] update requirements.txt
+    - [X] update requirements.txt
 
 
 - [ ] Phase 3 (Create a python script to do the following)

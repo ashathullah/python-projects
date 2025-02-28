@@ -1,0 +1,2 @@
+error_captcha_reload_failed
+error_no_download

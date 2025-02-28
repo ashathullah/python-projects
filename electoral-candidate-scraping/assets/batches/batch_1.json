@@ -9,10 +9,10 @@
     "father_name": "எம்,ஜி,ஆர்",
     "age": 49,
     "category": "மற்றவை",
-    "status": "completed",
+    "status": "not_processed",
     "download_url": "https://tnsec.tn.nic.in/nomination/project_main/nomination_view/electoral_roll_download_check.php?id=NDU2OTM=&dcode=MzE=&bcode=Mw==&pvcode=Mw==",
     "id": 1,
-    "pdf_file_path": "pdfs\\அரயலர\\அரயலர\\அரஙகல\\தரமத-பரமஸவர.pdf",
+    "pdf_file_path": "",
     "image_file_path": "",
     "extracted_data": {}
   },

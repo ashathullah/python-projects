@@ -9,10 +9,10 @@
     "father_name": "மாரிமுத்து",
     "age": 65,
     "category": "மற்றவை",
-    "status": "completed",
+    "status": "not_processed",
     "download_url": "https://tnsec.tn.nic.in/nomination/project_main/nomination_view/electoral_roll_download_check.php?id=ODg3MDY=&dcode=MTA=&bcode=MTY=&pvcode=Mg==",
     "id": 2001,
-    "pdf_file_path": "pdfs\\ஈரோடு\\நம்பியூர்\\அஞ்சானூர்\\திரு-பாலசுப்பிரமணியன்.pdf",
+    "pdf_file_path": "",
     "image_file_path": "",
     "extracted_data": {}
   },

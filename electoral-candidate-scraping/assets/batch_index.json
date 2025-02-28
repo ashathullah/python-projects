@@ -46,7 +46,7 @@
       "entries": 500,
       "start_id": 2001,
       "end_id": 2500,
-      "status": "in_progress"
+      "status": "not_started"
     },
     {
       "batch_id": 6,
