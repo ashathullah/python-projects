@@ -27,6 +27,7 @@ os.makedirs(base_dir, exist_ok=True)
 processed_files = set()
 success_count = 0
 error_count = 0
+skipped_count = 0
 
 def clean_filename(name, serial="unknown"):
     """Create a clean, valid filename from a candidate name and serial number"""
@@ -52,6 +53,12 @@ for entry in data:
         continue
     
     if "block_name" not in entry or "village_name" not in entry:
+        continue
+    
+    # Skip entries that have a status value (not empty)
+    if "status" in entry and entry["status"].strip():
+        print(f"Skipping candidate {entry.get('name', 'Unknown')}: Status = {entry['status']}")
+        skipped_count += 1
         continue
     
     # Create directory structure: district/block/village
@@ -106,4 +113,5 @@ except Exception as e:
 
 print(f"File organization completed:")
 print(f"- Successfully processed: {success_count} files")
+print(f"- Files skipped (with status): {skipped_count} files")
 print(f"- Errors encountered: {error_count} files")
