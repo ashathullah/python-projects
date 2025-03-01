@@ -129,7 +129,7 @@ def process_entry(entry, driver):
     
     if not url:
         print(f"Entry {entry_id}: No download URL found")
-        entry['status'] = 'error_no_url'
+        entry['download_status'] = 'error_no_url'
         return False, 0
 
     try:
@@ -176,10 +176,10 @@ def process_entry(entry, driver):
                             continue
                         except Exception as e:
                             print(f"Entry {entry_id}: Failed to find or click reload button: {e}")
-                            entry['status'] = 'error_captcha_reload_failed'
+                            entry['download_status'] = 'error_captcha_reload_failed'
                             return False, time.time() - start_time
                     else:
-                        entry['status'] = 'error_captcha_unsolved'
+                        entry['download_status'] = 'error_captcha_unsolved'
                         return False, time.time() - start_time
 
                 print(f"Entry {entry_id}: Solved captcha - '{captcha_solution}'")
@@ -211,10 +211,10 @@ def process_entry(entry, driver):
                                 continue
                             except Exception as e:
                                 print(f"Entry {entry_id}: Failed to find or click reload button after error: {e}")
-                                entry['status'] = 'error_captcha_reload_failed'
+                                entry['download_status'] = 'error_captcha_reload_failed'
                                 return False, time.time() - start_time
                         else:
-                            entry['status'] = 'error_invalid_captcha'
+                            entry['download_status'] = 'error_invalid_captcha'
                             return False, time.time() - start_time
                 except:
                     pass  # No error found, continue
@@ -252,11 +252,11 @@ def process_entry(entry, driver):
                             continue
                         except Exception as e:
                             print(f"Entry {entry_id}: Failed to find or click reload button after no download: {e}")
-                            entry['status'] = 'error_captcha_reload_failed'
+                            entry['download_status'] = 'error_captcha_reload_failed'
                             return False, time.time() - start_time
                     else:
                         print(f"Entry {entry_id}: No PDF downloaded after all attempts")
-                        entry['status'] = 'error_no_download'
+                        entry['download_status'] = 'error_no_download'
                         return False, time.time() - start_time
 
                 # Create directory structure based on district, block, and village
@@ -289,7 +289,7 @@ def process_entry(entry, driver):
 
                 # Store the file path in the entry
                 entry['pdf_file_path'] = os.path.relpath(target_path, start=os.path.dirname(PDFS_FOLDER))
-                entry['status'] = 'completed'
+                entry['download_status'] = 'completed'
 
                 elapsed_time = time.time() - start_time
                 print(f"Entry {entry_id}: Processed successfully in {elapsed_time:.2f} seconds")
@@ -305,12 +305,12 @@ def process_entry(entry, driver):
                     time.sleep(3)
                     continue
                 else:
-                    entry['status'] = 'error_element_not_found'
+                    entry['download_status'] = 'error_element_not_found'
                     return False, time.time() - start_time
 
     except Exception as e:
         print(f"Entry {entry_id}: Processing error - {e}")
-        entry['status'] = f'error_processing'
+        entry['download_status'] = f'error_processing'
         return False, time.time() - start_time
 
 def main(start_id=START_ID, batch_size=BATCH_SIZE):
@@ -359,7 +359,7 @@ def main(start_id=START_ID, batch_size=BATCH_SIZE):
         else:
             # Process all batches that are not completed
             batches_to_process = [batch for batch in batch_index['batches'] 
-                                 if batch['status'] != 'completed']
+                                 if batch['download_status'] != 'completed']
 
         print(f"Found {len(batches_to_process)} batches to process")
 
@@ -385,19 +385,19 @@ def main(start_id=START_ID, batch_size=BATCH_SIZE):
                 continue
 
             # Update batch status to in_progress
-            batch_info['status'] = 'in_progress'
+            batch_info['download_status'] = 'in_progress'
             save_batch_index(batch_index)
 
             # Count pending entries in this batch
             entries_to_process = [
                 entry for entry in batch_data 
-                if entry.get('status') in ['not_processed', 'pending']
+                if entry.get('download_status') in ['not_processed', 'pending']
             ]
 
             # Skip if no pending entries
             if not entries_to_process:
                 print(f"No pending entries in batch {batch_id}. Marking as completed.")
-                batch_info['status'] = 'completed'
+                batch_info['download_status'] = 'completed'
                 save_batch_index(batch_index)
                 continue
 
@@ -413,7 +413,7 @@ def main(start_id=START_ID, batch_size=BATCH_SIZE):
 
             for i, entry in enumerate(batch_data):
                 # Only process entries that need processing and meet start_id criteria
-                if (entry.get('status') in ['not_processed', 'pending'] and 
+                if (entry.get('download_status') in ['not_processed', 'pending'] and 
                     (start_id is None or entry.get('id', 0) >= start_id)):
 
                     print(f"\n------------------------------------------------------------")
@@ -456,9 +456,9 @@ def main(start_id=START_ID, batch_size=BATCH_SIZE):
                     time.sleep(delay)
 
             # Check if all entries in the batch are processed
-            remaining_pending = sum(1 for e in batch_data if e.get('status') in ['not_processed', 'pending'])
+            remaining_pending = sum(1 for e in batch_data if e.get('download_status') in ['not_processed', 'pending'])
             if remaining_pending == 0:
-                batch_info['status'] = 'completed'
+                batch_info['download_status'] = 'completed'
                 print(f"Batch {batch_id} completed successfully.")
             else:
                 print(f"Batch {batch_id} has {remaining_pending} entries still pending.")
@@ -481,9 +481,9 @@ def main(start_id=START_ID, batch_size=BATCH_SIZE):
 
         # Overall batch status
         batch_statuses = {
-            'not_started': sum(1 for b in batch_index['batches'] if b['status'] == 'not_started'),
-            'in_progress': sum(1 for b in batch_index['batches'] if b['status'] == 'in_progress'),
-            'completed': sum(1 for b in batch_index['batches'] if b['status'] == 'completed')
+            'not_started': sum(1 for b in batch_index['batches'] if b['download_status'] == 'not_started'),
+            'in_progress': sum(1 for b in batch_index['batches'] if b['download_status'] == 'in_progress'),
+            'completed': sum(1 for b in batch_index['batches'] if b['download_status'] == 'completed')
         }
 
         print(f"Batch status summary:")

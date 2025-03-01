@@ -45,10 +45,18 @@ def excel_to_json(limit=None, batch_size=500):
         count = 1
         for entry in data_list:
             entry['id'] = count
-            entry['status'] = 'not_processed'
+            entry['download_status'] = 'not_processed'
             entry['pdf_file_path'] = ''
             entry['image_file_path'] = ''
             entry['extracted_data'] = {}
+            
+            # Handle the status field - keep it empty if it's empty, otherwise keep its value
+            if 'status' in entry:
+                # Check for empty status (NaN, None, empty string, etc.)
+                if pd.isna(entry['status']) or entry['status'] == '' or entry['status'] is None:
+                    entry['status'] = ''
+                # If status has a value, it's kept as is
+            
             count += 1
         
         # Calculate number of batches
