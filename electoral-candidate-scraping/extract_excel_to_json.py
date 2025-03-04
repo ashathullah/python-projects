@@ -38,6 +38,14 @@ def excel_to_json(limit=None, batch_size=500):
         else:
             print(f"Processing all {len(df)} entries")
         
+        # Filter out entries with non-empty status
+        if 'status' in df.columns:
+            # Keep only rows where status is empty (NaN, None, or empty string)
+            original_count = len(df)
+            df = df[df['status'].isna() | (df['status'] == '')]
+            filtered_count = len(df)
+            print(f"Filtered out {original_count - filtered_count} entries with non-empty status")
+        
         # Convert DataFrame to list of dictionaries
         data_list = df.to_dict(orient='records')
         
@@ -50,12 +58,8 @@ def excel_to_json(limit=None, batch_size=500):
             entry['image_file_path'] = ''
             entry['extracted_data'] = {}
             
-            # Handle the status field - keep it empty if it's empty, otherwise keep its value
-            if 'status' in entry:
-                # Check for empty status (NaN, None, empty string, etc.)
-                if pd.isna(entry['status']) or entry['status'] == '' or entry['status'] is None:
-                    entry['status'] = ''
-                # If status has a value, it's kept as is
+            # Status will be empty as we've already filtered
+            entry['status'] = ''
             
             count += 1
         
