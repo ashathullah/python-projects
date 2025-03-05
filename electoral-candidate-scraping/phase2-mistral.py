@@ -26,7 +26,9 @@ MAX_DELAY = 2  # Maximum delay between requests (seconds)
 
 # Configuration variables
 # Set start_id to None to process all entries, or set a specific ID to skip entries before that ID
-START_ID = 2001 # Example: 2001 would skip the first 2000 entries
+START_ID = 10607 # Example: 2001 would skip the first 2000 entries
+# Set end_id to None to process all entries after start_id, or set a specific ID to stop processing after that ID
+END_ID = 12818  # Example: 3000 would process entries from start_id up to 3000
 # Size of each batch (default is 500)
 BATCH_SIZE = 500
 
@@ -180,7 +182,7 @@ def process_entry(entry, driver):
         # Variables for CAPTCHA retry logic
         captcha_solved = False
         captcha_attempts = 0
-        max_captcha_attempts = 3  # Initial attempt + 2 retries
+        max_captcha_attempts = 5  # Initial attempt + 2 retries
         
         # CAPTCHA solving loop
         while not captcha_solved and captcha_attempts < max_captcha_attempts:
@@ -353,16 +355,18 @@ def process_entry(entry, driver):
         entry['download_status'] = f'error_processing'
         return False, time.time() - start_time
 
-def main(start_id=START_ID, batch_size=BATCH_SIZE):
+def main(start_id=START_ID, end_id=END_ID, batch_size=BATCH_SIZE):
     """
     Main function to process batch files.
     
     Args:
         start_id (int, optional): ID to start processing from. Default is START_ID.
+        end_id (int, optional): ID to end processing at. Default is END_ID.
         batch_size (int, optional): Size of each batch. Default is BATCH_SIZE.
     """
     print(f"Starting processing with configuration:")
     print(f"  Start ID: {start_id if start_id is not None else 'None (processing all)'}")
+    print(f"  End ID: {end_id if end_id is not None else 'None (processing to the end)'}")
     print(f"  Batch size: {batch_size}")
     
     # Load the batch index
@@ -372,6 +376,11 @@ def main(start_id=START_ID, batch_size=BATCH_SIZE):
         return
     
     print(f"Loaded batch index with {len(batch_index['batches'])} batches")
+    
+    # Debugging: Print the ID ranges of all batches
+    print("\nDEBUG - Batch ID ranges:")
+    for batch_info in batch_index['batches']:
+        print(f"Batch {batch_info['batch_id']}: Start ID={batch_info['start_id']}, End ID={batch_info['end_id']}")
     
     # Configure Chrome WebDriver
     chrome_options = Options()
@@ -388,13 +397,27 @@ def main(start_id=START_ID, batch_size=BATCH_SIZE):
     driver = webdriver.Chrome(options=chrome_options)
     
     try:
-        # Determine which batches to process based on start_id
+        # Determine which batches to process based on start_id and end_id
         batches_to_process = []
         
-        if start_id is not None:
-            # Find batches that contain or come after the start_id
+        if start_id is not None or end_id is not None:
+            # Converting start_id and end_id to int to ensure proper comparison
+            start_id_int = int(start_id) if start_id is not None else None
+            end_id_int = int(end_id) if end_id is not None else None
+            
+            print(f"\nDEBUG - Looking for batches between IDs {start_id_int} and {end_id_int}")
+            
+            # Find batches that fall within the specified ID range
             for batch_info in batch_index['batches']:
-                if batch_info['end_id'] >= start_id:
+                batch_start = int(batch_info['start_id']) if isinstance(batch_info['start_id'], (str, int)) else 0
+                batch_end = int(batch_info['end_id']) if isinstance(batch_info['end_id'], (str, int)) else 0
+                
+                print(f"DEBUG - Evaluating batch {batch_info['batch_id']}: {batch_start}-{batch_end}")
+                
+                # Check if batch overlaps with our range
+                if (start_id_int is None or batch_end >= start_id_int) and \
+                   (end_id_int is None or batch_start <= end_id_int):
+                    print(f"DEBUG - Adding batch {batch_info['batch_id']} to process list")
                     batches_to_process.append(batch_info)
         else:
             # Process all batches that are not completed
@@ -406,7 +429,58 @@ def main(start_id=START_ID, batch_size=BATCH_SIZE):
         # Variables for time estimation
         start_time_total = time.time()
         completed_entries = 0
-        total_entries_to_process = sum(batch['entries'] for batch in batches_to_process)
+        total_entries_to_process = 0
+        
+        # Count entries within the specified range for time estimation
+        for batch_info in batches_to_process:
+            batch_file = batch_info['filename']
+            batch_data = load_batch(batch_file)
+            if batch_data:
+                print(f"\nDEBUG - Examining batch file: {batch_file}")
+                print(f"DEBUG - Total entries in batch: {len(batch_data)}")
+                
+                # Get a sample of entries to check the ID format
+                sample_entries = batch_data[:3] if len(batch_data) >= 3 else batch_data
+                for entry in sample_entries:
+                    print(f"DEBUG - Sample entry ID: {entry.get('id')} (type: {type(entry.get('id')).__name__})")
+                
+                # Convert ID values for comparison if needed
+                entries_in_range = []
+                for entry in batch_data:
+                    entry_id = entry.get('id')
+                    # Try to convert the ID to int for comparison
+                    try:
+                        entry_id_int = int(entry_id) if entry_id else 0
+                    except (ValueError, TypeError):
+                        entry_id_int = 0
+                        print(f"DEBUG - Could not convert ID {entry_id} to integer")
+                    
+                    # Check if the entry is in our processing range
+                    if (entry.get('status') in ['not_processed', 'pending']) and \
+                       (start_id_int is None or entry_id_int >= start_id_int) and \
+                       (end_id_int is None or entry_id_int <= end_id_int):
+                        entries_in_range.append(entry)
+                
+                if entries_in_range:
+                    print(f"DEBUG - Found {len(entries_in_range)} entries in ID range {start_id_int}-{end_id_int}")
+                    print(f"DEBUG - First entry in range: ID={entries_in_range[0].get('id')}")
+                    print(f"DEBUG - Last entry in range: ID={entries_in_range[-1].get('id')}")
+                else:
+                    print(f"DEBUG - No entries found in range {start_id_int}-{end_id_int}")
+                
+                total_entries_to_process += len(entries_in_range)
+                
+        print(f"Total entries to process within ID range: {total_entries_to_process}")
+        
+        # If no entries found, exit early
+        if total_entries_to_process == 0:
+            print("\nNo entries found to process within the specified ID range.")
+            print("Please check if:")
+            print("1. The ID range is correct")
+            print("2. The entries have the expected ID format (numeric vs string)")
+            print("3. The batch files contain entries with the specified IDs")
+            return
+        
         total_processing_time = 0
         
         # Process each batch
@@ -428,80 +502,94 @@ def main(start_id=START_ID, batch_size=BATCH_SIZE):
             batch_info['download_status'] = 'in_progress'
             save_batch_index(batch_index)
             
-            # Count pending entries in this batch
-            entries_to_process = [
-                entry for entry in batch_data 
-                if entry.get('status') in ['not_processed', 'pending']
-            ]
+            # Count entries in this batch that match our criteria
+            entries_to_process = []
             
-            # Skip if no pending entries
+            # Filter by status and ID range
+            for entry in batch_data:
+                entry_id = entry.get('id')
+                # Try to convert the ID to int for comparison
+                try:
+                    entry_id_int = int(entry_id) if entry_id else 0
+                except (ValueError, TypeError):
+                    entry_id_int = 0
+                
+                if (entry.get('status') in ['not_processed', 'pending']) and \
+                   (start_id_int is None or entry_id_int >= start_id_int) and \
+                   (end_id_int is None or entry_id_int <= end_id_int):
+                    entries_to_process.append(entry)
+            
+            # Skip if no entries to process in this batch
             if not entries_to_process:
-                print(f"No pending entries in batch {batch_id}. Marking as completed.")
-                batch_info['download_status'] = 'completed'
-                save_batch_index(batch_index)
+                print(f"No entries to process in batch {batch_id} within the specified ID range.")
                 continue
                 
-            print(f"Found {len(entries_to_process)} pending entries in batch {batch_id}")
-            
-            # If start_id is specified, skip entries before it
-            if start_id is not None:
-                entries_to_process = [e for e in entries_to_process if e.get('id', 0) >= start_id]
-                print(f"After filtering by start_id {start_id}, {len(entries_to_process)} entries remain")
+            print(f"Found {len(entries_to_process)} entries to process in batch {batch_id}")
             
             # Process each entry in the batch
             batch_completed = 0
             
-            for i, entry in enumerate(batch_data):
-                # Only process entries that need processing and meet start_id criteria
-                if (entry.get('status') in ['not_processed', 'pending'] and 
-                    (start_id is None or entry.get('id', 0) >= start_id)):
+            for entry in entries_to_process:
+                print(f"\n------------------------------------------------------------")
+                print(f"Processing {batch_completed+1}/{len(entries_to_process)} in batch {batch_id}: Entry ID {entry.get('id', 'unknown')}")
+                
+                # Process the entry and get elapsed time
+                success, elapsed_time = process_entry(entry, driver)
+                
+                if success:
+                    batch_completed += 1
+                    completed_entries += 1
+                    total_processing_time += elapsed_time
+                
+                # Save progress after each entry
+                save_batch(batch_data, batch_file)
+                
+                # Calculate and display time estimates
+                if completed_entries > 0:
+                    avg_time_per_entry = total_processing_time / completed_entries
+                    remaining_entries = total_entries_to_process - completed_entries
+                    estimated_remaining_time = avg_time_per_entry * remaining_entries
                     
-                    print(f"\n------------------------------------------------------------")
-                    print(f"Processing {batch_completed+1}/{len(entries_to_process)} in batch {batch_id}: Entry ID {entry.get('id', 'unknown')}")
+                    # Convert to hours, minutes, seconds
+                    hours, remainder = divmod(estimated_remaining_time, 3600)
+                    minutes, seconds = divmod(remainder, 60)
                     
-                    # Process the entry and get elapsed time
-                    success, elapsed_time = process_entry(entry, driver)
+                    elapsed_total = time.time() - start_time_total
+                    elapsed_hours, remainder = divmod(elapsed_total, 3600)
+                    elapsed_minutes, elapsed_seconds = divmod(remainder, 60)
                     
-                    if success:
-                        batch_completed += 1
-                        completed_entries += 1
-                        total_processing_time += elapsed_time
-                    
-                    # Save progress after each entry
-                    save_batch(batch_data, batch_file)
-                    
-                    # Calculate and display time estimates
-                    if completed_entries > 0:
-                        avg_time_per_entry = total_processing_time / completed_entries
-                        remaining_entries = total_entries_to_process - completed_entries
-                        estimated_remaining_time = avg_time_per_entry * remaining_entries
-                        
-                        # Convert to hours, minutes, seconds
-                        hours, remainder = divmod(estimated_remaining_time, 3600)
-                        minutes, seconds = divmod(remainder, 60)
-                        
-                        elapsed_total = time.time() - start_time_total
-                        elapsed_hours, remainder = divmod(elapsed_total, 3600)
-                        elapsed_minutes, elapsed_seconds = divmod(remainder, 60)
-                        
-                        print(f"\nProgress: {completed_entries}/{total_entries_to_process} entries processed ({(completed_entries/total_entries_to_process)*100:.1f}%)")
-                        print(f"Average processing time: {avg_time_per_entry:.2f} seconds per entry")
-                        print(f"Elapsed time: {int(elapsed_hours)}h {int(elapsed_minutes)}m {int(elapsed_seconds)}s")
-                        print(f"Estimated time remaining: {int(hours)}h {int(minutes)}m {int(seconds)}s")
-                        print(f"Estimated completion: {datetime.datetime.now() + datetime.timedelta(seconds=estimated_remaining_time)}")
-                    
-                    # Random delay between requests to avoid being blocked
-                    delay = random.uniform(MIN_DELAY, MAX_DELAY)
-                    print(f"Waiting {delay:.2f} seconds before next request...")
-                    time.sleep(delay)
+                    print(f"\nProgress: {completed_entries}/{total_entries_to_process} entries processed ({(completed_entries/total_entries_to_process)*100:.1f}%)")
+                    print(f"Average processing time: {avg_time_per_entry:.2f} seconds per entry")
+                    print(f"Elapsed time: {int(elapsed_hours)}h {int(elapsed_minutes)}m {int(elapsed_seconds)}s")
+                    print(f"Estimated time remaining: {int(hours)}h {int(minutes)}m {int(seconds)}s")
+                    print(f"Estimated completion: {datetime.datetime.now() + datetime.timedelta(seconds=estimated_remaining_time)}")
+                
+                # Random delay between requests to avoid being blocked
+                delay = random.uniform(MIN_DELAY, MAX_DELAY)
+                print(f"Waiting {delay:.2f} seconds before next request...")
+                time.sleep(delay)
             
-            # Check if all entries in the batch are processed
+            # Check if all entries in the batch are fully processed (ignoring ID range filter)
             remaining_pending = sum(1 for e in batch_data if e.get('status') in ['not_processed', 'pending'])
             if remaining_pending == 0:
                 batch_info['download_status'] = 'completed'
                 print(f"Batch {batch_id} completed successfully.")
             else:
-                print(f"Batch {batch_id} has {remaining_pending} entries still pending.")
+                # Only mark complete if we processed all entries in our filter range
+                processed_in_range = sum(1 for e in batch_data 
+                                          if (start_id_int is None or int(e.get('id', 0)) >= start_id_int)
+                                          and (end_id_int is None or int(e.get('id', 0)) <= end_id_int))
+                
+                pending_in_range = sum(1 for e in batch_data 
+                                      if e.get('status') in ['not_processed', 'pending']
+                                      and (start_id_int is None or int(e.get('id', 0)) >= start_id_int)
+                                      and (end_id_int is None or int(e.get('id', 0)) <= end_id_int))
+                
+                if pending_in_range == 0:
+                    print(f"Batch {batch_id}: Processed all {processed_in_range} entries in the specified ID range.")
+                    print(f"Batch {batch_id} still has {remaining_pending} entries pending outside the specified range.")
+                else:
+                    print(f"Batch {batch_id} has {pending_in_range} entries still pending in the specified ID range.")
             
             # Update batch index
             save_batch_index(batch_index)
@@ -518,6 +606,8 @@ def main(start_id=START_ID, batch_size=BATCH_SIZE):
         
         print(f"Total runtime: {int(hours)}h {int(minutes)}m {int(seconds)}s")
         print(f"Completed entries in this run: {completed_entries}")
+        
+        print(f"ID Range: {start_id or 'Beginning'} to {end_id or 'End'}")
         
         # Overall batch status
         batch_statuses = {

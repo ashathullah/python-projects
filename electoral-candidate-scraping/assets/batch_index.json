@@ -199,7 +199,7 @@
       "entries": 500,
       "start_id": 10501,
       "end_id": 11000,
-      "download_status": "not_started"
+      "download_status": "in_progress"
     },
     {
       "batch_id": 23,
@@ -208,7 +208,7 @@
       "entries": 500,
       "start_id": 11001,
       "end_id": 11500,
-      "download_status": "not_started"
+      "download_status": "completed"
     },
     {
       "batch_id": 24,
@@ -217,7 +217,7 @@
       "entries": 500,
       "start_id": 11501,
       "end_id": 12000,
-      "download_status": "not_started"
+      "download_status": "completed"
     },
     {
       "batch_id": 25,
@@ -226,7 +226,7 @@
       "entries": 500,
       "start_id": 12001,
       "end_id": 12500,
-      "download_status": "not_started"
+      "download_status": "completed"
     },
     {
       "batch_id": 26,
@@ -235,7 +235,7 @@
       "entries": 500,
       "start_id": 12501,
       "end_id": 13000,
-      "download_status": "not_started"
+      "download_status": "in_progress"
     },
     {
       "batch_id": 27,

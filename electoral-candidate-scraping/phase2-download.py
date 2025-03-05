@@ -26,7 +26,9 @@ MAX_DELAY = 2  # Maximum delay between requests (seconds)
 
 # Configuration variables
 # Set start_id to None to process all entries, or set a specific ID to skip entries before that ID
-START_ID = 2001  # Example: 2001 would skip the first 2000 entries
+START_ID = 10569  # Example: 2001 would skip the first 2000 entries
+# Set end_id to None to process all entries after start_id, or set a specific ID to stop processing after that ID
+END_ID = 12818  # Example: 3000 would process entries from start_id up to 3000
 # Size of each batch (default is 500)
 BATCH_SIZE = 500
 
@@ -338,16 +340,18 @@ def cleanup_captcha_images(image_paths):
         except Exception as e:
             print(f"Failed to delete CAPTCHA image {img_path}: {e}")
 
-def main(start_id=START_ID, batch_size=BATCH_SIZE):
+def main(start_id=START_ID, end_id=END_ID, batch_size=BATCH_SIZE):
     """
     Main function to process batch files.
 
     Args:
         start_id (int, optional): ID to start processing from. Default is START_ID.
+        end_id (int, optional): ID to end processing at. Default is END_ID.
         batch_size (int, optional): Size of each batch. Default is BATCH_SIZE.
     """
     print(f"Starting processing with configuration:")
     print(f"  Start ID: {start_id if start_id is not None else 'None (processing all)'}")
+    print(f"  End ID: {end_id if end_id is not None else 'None (processing to the end)'}")
     print(f"  Batch size: {batch_size}")
 
     # Load the batch index
@@ -373,13 +377,14 @@ def main(start_id=START_ID, batch_size=BATCH_SIZE):
     driver = webdriver.Chrome(options=chrome_options)
 
     try:
-        # Determine which batches to process based on start_id
+        # Determine which batches to process based on start_id and end_id
         batches_to_process = []
 
-        if start_id is not None:
-            # Find batches that contain or come after the start_id
+        if start_id is not None or end_id is not None:
+            # Find batches that fall within the specified ID range
             for batch_info in batch_index['batches']:
-                if batch_info['end_id'] >= start_id:
+                if (start_id is None or batch_info['end_id'] >= start_id) and \
+                   (end_id is None or batch_info['start_id'] <= end_id):
                     batches_to_process.append(batch_info)
         else:
             # Process all batches that are not completed
@@ -391,7 +396,23 @@ def main(start_id=START_ID, batch_size=BATCH_SIZE):
         # Variables for time estimation
         start_time_total = time.time()
         completed_entries = 0
-        total_entries_to_process = sum(batch['entries'] for batch in batches_to_process)
+        total_entries_to_process = 0
+        
+        # Count entries within the specified range for time estimation
+        for batch_info in batches_to_process:
+            batch_file = batch_info['filename']
+            batch_data = load_batch(batch_file)
+            if batch_data:
+                entries_in_range = [
+                    entry for entry in batch_data 
+                    if entry.get('download_status') in ['not_processed', 'pending']
+                    and (start_id is None or entry.get('id', 0) >= start_id)
+                    and (end_id is None or entry.get('id', 0) <= end_id)
+                ]
+                total_entries_to_process += len(entries_in_range)
+                
+        print(f"Total entries to process within ID range: {total_entries_to_process}")
+        
         total_processing_time = 0
 
         # Process each batch
@@ -413,33 +434,35 @@ def main(start_id=START_ID, batch_size=BATCH_SIZE):
             batch_info['download_status'] = 'in_progress'
             save_batch_index(batch_index)
 
-            # Count pending entries in this batch
+            # Count entries in this batch that match our criteria
             entries_to_process = [
                 entry for entry in batch_data 
                 if entry.get('download_status') in ['not_processed', 'pending']
             ]
 
-            # Skip if no pending entries
+            # Filter by start_id and end_id if specified
+            if start_id is not None or end_id is not None:
+                entries_to_process = [
+                    e for e in entries_to_process 
+                    if (start_id is None or e.get('id', 0) >= start_id)
+                    and (end_id is None or e.get('id', 0) <= end_id)
+                ]
+
+            # Skip if no entries to process in this batch
             if not entries_to_process:
-                print(f"No pending entries in batch {batch_id}. Marking as completed.")
-                batch_info['download_status'] = 'completed'
-                save_batch_index(batch_index)
+                print(f"No entries to process in batch {batch_id} within the specified ID range.")
                 continue
 
-            print(f"Found {len(entries_to_process)} pending entries in batch {batch_id}")
-
-            # If start_id is specified, skip entries before it
-            if start_id is not None:
-                entries_to_process = [e for e in entries_to_process if e.get('id', 0) >= start_id]
-                print(f"After filtering by start_id {start_id}, {len(entries_to_process)} entries remain")
+            print(f"Found {len(entries_to_process)} entries to process in batch {batch_id}")
 
             # Process each entry in the batch
             batch_completed = 0
 
             for i, entry in enumerate(batch_data):
-                # Only process entries that need processing and meet start_id criteria
+                # Only process entries that need processing and meet ID criteria
                 if (entry.get('download_status') in ['not_processed', 'pending'] and 
-                    (start_id is None or entry.get('id', 0) >= start_id)):
+                    (start_id is None or entry.get('id', 0) >= start_id) and
+                    (end_id is None or entry.get('id', 0) <= end_id)):
 
                     print(f"\n------------------------------------------------------------")
                     print(f"Processing {batch_completed+1}/{len(entries_to_process)} in batch {batch_id}: Entry ID {entry.get('id', 'unknown')}")
@@ -480,13 +503,27 @@ def main(start_id=START_ID, batch_size=BATCH_SIZE):
                     print(f"Waiting {delay:.2f} seconds before next request...")
                     time.sleep(delay)
 
-            # Check if all entries in the batch are processed
+            # Check if all entries in the batch are fully processed (ignoring ID range filter)
             remaining_pending = sum(1 for e in batch_data if e.get('download_status') in ['not_processed', 'pending'])
             if remaining_pending == 0:
                 batch_info['download_status'] = 'completed'
                 print(f"Batch {batch_id} completed successfully.")
             else:
-                print(f"Batch {batch_id} has {remaining_pending} entries still pending.")
+                # Only mark complete if we processed all entries in our filter range
+                processed_in_range = sum(1 for e in batch_data 
+                                         if (start_id is None or e.get('id', 0) >= start_id)
+                                         and (end_id is None or e.get('id', 0) <= end_id))
+                
+                pending_in_range = sum(1 for e in batch_data 
+                                      if e.get('download_status') in ['not_processed', 'pending']
+                                      and (start_id is None or e.get('id', 0) >= start_id)
+                                      and (end_id is None or e.get('id', 0) <= end_id))
+                
+                if pending_in_range == 0:
+                    print(f"Batch {batch_id}: Processed all {processed_in_range} entries in the specified ID range.")
+                    print(f"Batch {batch_id} still has {remaining_pending} entries pending outside the specified range.")
+                else:
+                    print(f"Batch {batch_id} has {pending_in_range} entries still pending in the specified ID range.")
 
             # Update batch index
             save_batch_index(batch_index)
@@ -503,6 +540,8 @@ def main(start_id=START_ID, batch_size=BATCH_SIZE):
 
         print(f"Total runtime: {int(hours)}h {int(minutes)}m {int(seconds)}s")
         print(f"Completed entries in this run: {completed_entries}")
+        
+        print(f"ID Range: {start_id or 'Beginning'} to {end_id or 'End'}")
 
         # Overall batch status
         batch_statuses = {

@@ -1,2 +1,4 @@
 error_captcha_reload_failed
 error_no_download
+error_captcha_unsolved
+error_invalid_captcha
