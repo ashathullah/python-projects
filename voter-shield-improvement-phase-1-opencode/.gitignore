@@ -1,0 +1,14 @@
+.env
+.DS_Store
+png/
+jpg/
+page-csv/
+augmented_csvs/
+ocr/
+csv-flagged/
+crops/
+debug_*/
+__pycache__
+logs/
+trash/
+out.txt
