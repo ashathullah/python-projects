@@ -1,0 +1,19 @@
+# Dependencies for pdf-converter
+PyMuPDF
+
+# OCR with GPU support
+easyocr
+torch
+torchvision
+opencv-python
+
+# PaddleOCR for Tamil OCR (GPU-accelerated)
+# Install GPU version: python -m pip install paddlepaddle-gpu
+paddleocr
+
+# ocr-tamil for specialized Tamil text recognition
+ocr-tamil
+
+# Tesseract OCR wrapper
+pytesseract
+Pillow
